@@ -2,15 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
+/* body {
   font-family: Arial, Helvetica, sans-serif;
-}
+  height:100vh;
+  width: 100vw;
+} */
 
-@layer utilities {
+/* @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
-}
+} */
 
 @layer base {
   :root {
