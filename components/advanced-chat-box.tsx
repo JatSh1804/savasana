@@ -17,6 +17,9 @@ import { AvatarIcon } from '@radix-ui/react-icons'
 import { logout } from '@/app/logout/actions'
 import { createClient } from '@/utils/supabase/client'
 import { SupabaseClient } from '@supabase/supabase-js'
+import { redirect } from 'next/navigation'
+import { useToast } from '@/hooks/use-toast'
+import Link from 'next/link'
 
 interface Message {
   id: number;
@@ -62,10 +65,10 @@ const supabase = createClient()
 export function AdvancedChatBoxComponent() {
 
   const [chatInstances, setChatInstances] = useState<ChatInstance[]>([
-    { id: 1, name: 'New Chat', messages: [] },
+    { id: Date.now(), name: 'New Chat', messages: [] },
   ]);
 
-
+  const { toast } = useToast();
   const [currentChatId, setCurrentChatId] = useState(1);
   const [inputMessage, setInputMessage] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -82,70 +85,77 @@ export function AdvancedChatBoxComponent() {
     return chatInstances.find(instance => instance.id === currentChatId);
   });
 
+  const [temperature, setTemperature] = useState(0.7);
+  const [max_tokens, setMaxTokens] = useState(100);
+  const [fine_tune, setFineTune] = useState('')
+  const [model, setModel] = useState('');
+
 
   useEffect(() => {
-    const user = getUser(supabase);
-  }, [])
+    const initUser = async () => {
+      const user = await getUser(supabase);
+      if (!user) {
+        redirect('/login')
+      } else {
+        const profile = await fetchProfile(user.id);
+        console.log('profile received-->', profile)
+        if (profile) {
+          fetchChatInstances(profile.id);
+        }
+      }
+    };
+
+    initUser();
+  }, []);
 
   const getUser = async (supabase: SupabaseClient) => {
     const { data, error } = await supabase.auth.getUser();
     if (error) {
-      console.error('Error fetching user profile:', error)
-    } else {
-      console.log("Received user---->", data.user)
-      fetchProfile(data.user.id)
+      console.error('Error fetching user:', error);
+      return null;
     }
     return data.user;
-  }
+  };
 
 
-  const fetchProfile = async (id: string) => {
-    if (id) {
-      console.log('id received to fetch Profile--->', id);
-      let profile;
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', id)
-        .single();
 
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return;
-      } else if (data) {
-        console.log("Received a user Profile--->");
-        console.log(data);
+  const fetchProfile = async (userId: string) => {
+    if (!userId) return null;
 
-        profile = data;
-        setUserProfile(data);
-      } else {
-        console.log("Creating a user Profile, doesn't exist----");
+    let { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
 
-        // Create a new user profile if it doesn't exist
+    let profile;
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Profile doesn't exist, create a new one
         const { data: newProfile, error: createError } = await supabase
           .from('user_profiles')
-          .insert({ id, tokens: 10 })
+          .insert({ id: userId, tokens: 10 })
           .single();
 
         if (createError) {
           console.error('Error creating user profile:', createError);
-        } else {
-          console.log('new profile created');
-          profile = newProfile;
-          setUserProfile(newProfile);
+          return null;
         }
-      }
-
-      if (profile?.id) {
-        setUserProfile(profile); // Ensure state is set before calling fetchChatInstances
-        fetchChatInstances(profile.id);
+        profile = newProfile;
+        console.log('New profile created-->', newProfile)
       } else {
-        console.log("user_id doesn't exist");
+        console.error('Error fetching user profile:', error);
+        return null;
       }
     }
+    if (data) {
+      console.log('Initial Received profile-->', profile)
+      profile = data;
+    }
+    setUserProfile(profile);
+    return profile;
   };
-
-
 
 
   const fetchChatInstances = async (user_id: string) => {
@@ -156,14 +166,28 @@ export function AdvancedChatBoxComponent() {
         .select('*')
         .eq('user_id', user_id)
         .order('created_at', { ascending: false })
+
       if (error) {
         console.error('Error fetching chat instances:', error)
       } else {
-        console.log('Received a chat instances', data);
-        setChatInstances(data || [])
+        console.log('Received a chat instances', data,);
+
         if (data && data.length > 0) {
+          setChatInstances(data)
           setCurrentChatId(data[0].id)
           console.log('Updating currentChatId', currentChatId);
+        }
+        else {
+          let newInstance: ChatInstance = { id: Date.now(), name: 'New Chat', messages: [] };
+          setChatInstances([newInstance]);
+          setCurrentChatId(newInstance.id);
+          const { error } = await supabase
+            .from('chat_instances')
+            .insert({ ...newInstance, user_id });
+
+          if (error) {
+            console.error('Error creating new chat instance:', error);
+          }
         }
       }
     } else {
@@ -231,37 +255,24 @@ export function AdvancedChatBoxComponent() {
         body: JSON.stringify({
           messages,
           modelOption: {
-            temperature: 0.7,
-            max_tokens: 100,
+            system: fine_tune,
+            model,
+            temperature: temperature || 0.7,
+            max_tokens: max_tokens || 100,
           },
         }),
       });
 
-      if (response.status !== 200) throw new Error(response.status.toString());
+      if (response.status !== 200) {
+        handleError(response);
+        throw new Error(response.status.toString())
+      }
+
       if (!response.body) throw new Error('Response body does not exist');
 
       const lastGeneratedMessage = await getIterableStream(response.body);
 
-      let generatedText: Message = { id: Date.now(), text: '', sender: 'system' }
-      // Update chat instances with the AI response
-      setChatInstances(prevInstances =>
-        prevInstances.map(instance => {
-          if (instance.id === currentChatId) {
-            generatedText = {
-              id: Date.now(),
-              text: lastGeneratedMessage,
-              sender: 'system'
-            }
-            return {
-              ...instance,
-              messages: [...instance.messages, generatedText]
-            };
-          }
-          return instance;
-        })
-      );
-
-
+      let generatedText: Message = { id: Date.now(), text: lastGeneratedMessage, sender: 'system' }
 
       setGeneratedText('');
       setIsGenerating(false);
@@ -273,17 +284,42 @@ export function AdvancedChatBoxComponent() {
   };
 
   const updateChatInstance = async (chatId: number, messages: Message[]) => {
-    if (!supabase) return
+    if (!supabase) return;
 
-    const { error } = await supabase
-      .from('chat_instances')
-      .update({ messages })
-      .eq('id', chatId)
+    try {
+      const { error } = await supabase
+        .from('chat_instances')
+        .update({ messages })
+        .eq('id', chatId);
 
-    if (error) {
-      console.error('Error updating chat instance:', error)
+      if (error) {
+        console.error('Error updating chat instance:', error);
+      }
+    } catch (error) {
+      console.error('Error updating chat instance:', error);
     }
-  }
+  };
+
+
+  const handleError = (response: Response) => {
+    let errorMessage = 'An unexpected error occurred';
+
+    if (response?.status === 401) {
+      errorMessage = 'Unauthorized: Please log in.';
+    } else if (response?.status === 403) {
+      errorMessage = "You don't have enough tokens.";
+    } else if (response?.status === 500) {
+      errorMessage = 'Server error: Please try again later.';
+    } else if (response?.status === 400) {
+      errorMessage = 'Bad request: Missing messages or modelOption.';
+    }
+    toast({
+      title: errorMessage,
+      description: "Sorry! Could not proceed.",
+      variant: 'destructive'
+    })
+
+  };
 
 
   // const handleSendMessage = async () => {
@@ -334,53 +370,57 @@ export function AdvancedChatBoxComponent() {
       setIsGenerating(true);
       setInputMessage('');
 
-      // Update local state
-      setChatInstances(prevInstances => {
-        const updatedInstances = prevInstances.map(instance => {
-          if (instance.id === currentChatId) {
-            return {
-              ...instance,
-              messages: [...instance.messages, newMessage]
-            };
-          }
-          return instance;
-        });
-
-        // Find the updated current chat instance
-        const updatedCurrentChat = updatedInstances.find(chat => chat.id === currentChatId);
-
-        // Call sendMessage with the updated chat instance
-        if (updatedCurrentChat) {
-          sendMessage(updatedCurrentChat).then((aiResponse: Message | undefined) => {
-            if (aiResponse) {
-              // Update local state with AI response
-              let updatedMessages: Message[] = [];
-              setChatInstances(prevInstances => {
-                const finalInstances = prevInstances.map(instance => {
-                  if (instance.id === currentChatId) {
-                    updatedMessages = [...instance.messages, newMessage, aiResponse];
-
-                    // Update the database with both user message and AI response
-
-
-                    return {
-                      ...instance,
-                      messages: updatedMessages
-                    };
-                  }
-                  return instance;
-                });
-                return finalInstances;
-              });
-              updateChatInstance(currentChatId, updatedMessages);
-
-              setIsGenerating(false);
+      // Update chat instances and get the updated current chat
+      const updatedCurrentChat = await new Promise<ChatInstance | undefined>(resolve => {
+        setChatInstances(prevInstances => {
+          const updatedInstances = prevInstances.map(instance => {
+            if (instance.id === currentChatId) {
+              const updatedInstance = {
+                ...instance,
+                messages: [...instance.messages, newMessage]
+              };
+              updateChatInstance(instance.id, updatedInstance.messages);
+              return updatedInstance;
             }
+            return instance;
           });
-        }
 
-        return updatedInstances;
+          const currentChat = updatedInstances.find(chat => chat.id === currentChatId);
+          resolve(currentChat);
+          return updatedInstances;
+        });
       });
+
+      if (updatedCurrentChat) {
+        try {
+          const aiResponse = await sendMessage(updatedCurrentChat);
+
+          if (aiResponse) {
+            setChatInstances(prevInstances => {
+              return prevInstances.map(instance => {
+                if (instance.id === currentChatId) {
+                  const updatedMessages = [...instance.messages, aiResponse];
+                  updateChatInstance(instance.id, updatedMessages);
+                  return {
+                    ...instance,
+                    messages: updatedMessages
+                  };
+                }
+                return instance;
+              });
+            });
+          } else {
+            console.error('AI response is undefined');
+          }
+        } catch (error) {
+          console.error('Error sending message:', error);
+        } finally {
+          setIsGenerating(false);
+        }
+      } else {
+        console.error('Chat instance not found');
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -404,45 +444,101 @@ export function AdvancedChatBoxComponent() {
     setEditingText(newText);
   };
 
-  const handleRegenerateFromEdit = (editedMessageId: number) => {
+  // const handleRegenerateFromEdit = (editedMessageId: number) => {
+  //   setChatInstances(prevInstances => {
+  //     const updatedInstances = prevInstances.map(instance => {
+  //       if (instance.id === currentChatId) {
+  //         const editedMessageIndex = instance.messages.findIndex(msg => msg.id === editedMessageId);
+  //         if (editedMessageIndex !== -1) {
+  //           const newMessage: Message = {
+  //             id: Date.now(),
+  //             text: editingText,
+  //             sender: 'user',
+  //             referencedMessageId: editedMessageId,
+  //           };
+  //           const updatedMessages = [
+  //             ...instance.messages,
+  //             newMessage,
+  //           ];
+  //           return { ...instance, messages: updatedMessages };
+  //         }
+  //       }
+  //       return instance;
+  //     });
+
+  //     // Find the updated current chat instance
+  //     const updatedCurrentChat = updatedInstances.find(chat => chat.id === currentChatId);
+
+  //     // Call sendMessage with the updated chat instance
+  //     if (updatedCurrentChat) {
+  //       setIsGenerating(true);
+  //       sendMessage(updatedCurrentChat);
+  //     }
+
+  //     return updatedInstances;
+  //   });
+
+  //   // Clear editing state
+  //   setEditingId(null);
+  //   setEditingText('');
+  // };
+
+  const handleRegenerateFromEdit = async (editedMessageId: number) => {
+    setIsGenerating(true);
+
+    const editedMessage: Message = {
+      id: Date.now(),
+      text: editingText,
+      sender: 'user',
+      referencedMessageId: editedMessageId,
+    };
+
+    // First, update the chat instance with the edited message
     setChatInstances(prevInstances => {
-      const updatedInstances = prevInstances.map(instance => {
+      return prevInstances.map(instance => {
         if (instance.id === currentChatId) {
-          const editedMessageIndex = instance.messages.findIndex(msg => msg.id === editedMessageId);
-          if (editedMessageIndex !== -1) {
-            const newMessage: Message = {
-              id: Date.now(),
-              text: editingText,
-              sender: 'user',
-              referencedMessageId: editedMessageId,
-            };
-            const updatedMessages = [
-              ...instance.messages,
-              newMessage,
-            ];
-            return { ...instance, messages: updatedMessages };
-          }
+          const updatedMessages = [...instance.messages, editedMessage];
+          return { ...instance, messages: updatedMessages };
         }
         return instance;
       });
-
-      // Find the updated current chat instance
-      const updatedCurrentChat = updatedInstances.find(chat => chat.id === currentChatId);
-
-      // Call sendMessage with the updated chat instance
-      if (updatedCurrentChat) {
-        setIsGenerating(true);
-        sendMessage(updatedCurrentChat);
-      }
-
-      return updatedInstances;
     });
+
+    // Find the current chat after updating
+    const currentChat = chatInstances.find(chat => chat.id === currentChatId);
+
+    if (currentChat) {
+      try {
+        const aiResponse = await sendMessage(currentChat);
+        if (aiResponse) {
+          setChatInstances(prevInstances => {
+            const updatedInstances = prevInstances.map(instance => {
+              if (instance.id === currentChatId) {
+                const updatedMessages = [...instance.messages, aiResponse];
+                updateChatInstance(instance.id, updatedMessages);
+                return {
+                  ...instance,
+                  messages: updatedMessages
+                };
+              }
+              return instance;
+            });
+            return updatedInstances;
+          });
+        }
+      } catch (error) {
+        console.error('Error regenerating message:', error);
+      } finally {
+        setIsGenerating(false);
+      }
+    }
 
     // Clear editing state
     setEditingId(null);
     setEditingText('');
   };
 
+  
   const scrollToMessage = (id: number) => {
     messageRefs.current[id]?.scrollIntoView({ behavior: 'smooth' });
     console.log(messageRefs.current[id]?.classList.add('bg-cyan-200'))
@@ -451,26 +547,34 @@ export function AdvancedChatBoxComponent() {
     }, 800)
   };
 
-  const createNewChat = () => {
-    // if (user) {
-    //   const { data, error } = await supabase
-    //     .from('chat_instances')
-    //     .insert({ user_id: user.id, name: 'New Chat' })
-    //     .single()
+  const createNewChat = async () => {
+    if (userProfile) {
+      try {
+        const { data, error } = await supabase
+          .from('chat_instances')
+          .insert({ id: Date.now(), user_id: userProfile.id, name: 'New Chat', messages: [] })
+          .select();
 
-    //   if (error) {
-    //     console.error('Error creating new chat:', error)
-    //   } else if (data) {
-    //     setChatInstances(prev => [data, ...prev])
-    //     setCurrentChatId(data.id)
-    //   }
-    // }
-    const newChatId = Date.now();
-    setChatInstances(prevInstances => [
-      ...prevInstances,
-      { id: newChatId, name: 'New Chat', messages: [] }
-    ]);
-    setCurrentChatId(newChatId);
+
+        if (error) {
+          console.error('Error creating new chat:', error);
+          return;
+        }
+
+        if (data) {
+          if (data && data.length > 0) {
+            const newChatInstance: ChatInstance = data[0];
+            setChatInstances(prev => [newChatInstance, ...prev]);
+            setCurrentChatId(newChatInstance.id);
+          }
+          // setCurrentChatId(data.id);
+        }
+      } catch (error) {
+        console.error('Error creating new chat:', error);
+      }
+    } else {
+      console.error('User profile not available');
+    }
   };
 
 
@@ -501,23 +605,24 @@ export function AdvancedChatBoxComponent() {
   }
 
   const handleAudioRecording = () => {
-    // if (!isRecording) {
-    //   setIsRecording(true)
-    //   // Start recording logic here
-    //   // For demonstration, we'll just simulate a recording
-    //   setTimeout(() => {
-    //     setIsRecording(false)
-    //     const newMessage: Message = {
-    //       id: Date.now(),
-    //       // content: { type: 'audio', url: '/placeholder-audio.mp3' },
-    //       sender: 'user'
-    //     }
-    //     addMessageToCurrent(newMessage)
-    //   }, 3000)
-    // } else {
-    //   setIsRecording(false)
+    if (!isRecording) {
+      setIsRecording(true)
+      // Start recording logic here
+      // For demonstration, we'll just simulate a recording
+      setTimeout(() => {
+        setIsRecording(false)
+        const newMessage: Message = {
+          id: Date.now(),
+          text: 'text',
+          // content: { type: 'audio', url: '/placeholder-audio.mp3' },
+          sender: 'user'
+        }
+        addMessageToCurrent(newMessage)
+      }, 3000)
+    } else {
+      setIsRecording(false)
 
-    // }
+    }
   }
 
 
@@ -580,31 +685,36 @@ export function AdvancedChatBoxComponent() {
                       Configure the settings for the model and messages.
                     </DrawerDescription>
                   </DrawerHeader>
-                  <div className="p-4 pb-0">
+                  <div className="p-4 pb-2">
                     <form className="grid items-start gap-4">
                       <div className="grid gap-2">
+                        <Label htmlFor="top-k">Create a GPT</Label>
+                        <Input id="top-k" value={fine_tune} onChange={(e) => setFineTune(e.target.value)} type="text" placeholder="You are a chef, also knows bartending, and loves coffee, you are really funny and cute." />
+                      </div>
+
+                      <div className="grid gap-2">
                         <Label htmlFor="model">Model</Label>
-                        <Select>
+                        <Select onValueChange={(e) => { setModel(e) }}>
                           <SelectTrigger id="model">
                             <SelectValue placeholder="Select a model" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="genesis">
+                            <SelectItem value="llama-3.2-1b-preview">
                               <div className="flex items-center">
                                 <Rabbit className="mr-2 h-4 w-4" />
-                                <span>Neural Genesis</span>
+                                <span>llama-3.2-1b-preview</span>
                               </div>
                             </SelectItem>
-                            <SelectItem value="explorer">
+                            <SelectItem value="mixtral-8x7b-32768">
                               <div className="flex items-center">
                                 <Bird className="mr-2 h-4 w-4" />
-                                <span>Neural Explorer</span>
+                                <span>mixtral-8x7b-32768</span>
                               </div>
                             </SelectItem>
-                            <SelectItem value="quantum">
+                            <SelectItem value="gemma-7b-it">
                               <div className="flex items-center">
                                 <Turtle className="mr-2 h-4 w-4" />
-                                <span>Neural Quantum</span>
+                                <span>gemma-7b-it</span>
                               </div>
                             </SelectItem>
                           </SelectContent>
@@ -612,15 +722,12 @@ export function AdvancedChatBoxComponent() {
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="temperature">Temperature</Label>
-                        <Input id="temperature" type="number" placeholder="0.4" />
+                        <Input value={temperature} id="temperature" onChange={(e) => { setTemperature(Number(e.target.value)) }} type="number" placeholder="0.7" />
                       </div>
+
                       <div className="grid gap-2">
-                        <Label htmlFor="top-p">Top P</Label>
-                        <Input id="top-p" type="number" placeholder="0.7" />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="top-k">Top K</Label>
-                        <Input id="top-k" type="number" placeholder="0.0" />
+                        <Label htmlFor="top-p">Max Tokens</Label>
+                        <Input id="top-p" value={max_tokens} onChange={(e) => setMaxTokens(Number(e.target.value))} type="number" placeholder="100" />
                       </div>
                     </form>
                   </div>
@@ -639,8 +746,10 @@ export function AdvancedChatBoxComponent() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>Settings</DropdownMenuItem>
-                  <DropdownMenuItem>Support</DropdownMenuItem>
+                  <Link href={'/profile'}>
+                    <DropdownMenuItem>Profile</DropdownMenuItem>
+                  </Link>
+                  {/* <DropdownMenuItem></DropdownMenuItem> */}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => { logout() }}>Logout</DropdownMenuItem>
                 </DropdownMenuContent>
@@ -791,7 +900,7 @@ export function AdvancedChatBoxComponent() {
               >
                 <Mic className="h-4 w-4" />
               </Button>
-              <Button type="submit" disabled={isGenerating}>
+              <Button type="submit" onClick={() => handleSendMessage()} disabled={isGenerating}>
                 <Send className="h-4 w-4 mr-2" />
                 Send
               </Button>

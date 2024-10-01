@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { User } from "@supabase/supabase-js"
 import { logout } from "./logout/actions"
+import { redirect } from "next/navigation"
 export default function Profile() {
     const [user, setUser] = useState<User | null>(null);
 
@@ -41,8 +42,8 @@ export default function Profile() {
             <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem>Support</DropdownMenuItem>
+                {/* <DropdownMenuItem>Settings</DropdownMenuItem> */}
+                <Link href={'/profile'}><DropdownMenuItem >Profile</DropdownMenuItem></Link>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => { logout() }}>Logout</DropdownMenuItem>
             </DropdownMenuContent>
