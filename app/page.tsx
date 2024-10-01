@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import Profile from "./user"
+import Image from "next/image"
 
 export default function Component() {
     return (
@@ -52,7 +53,7 @@ export default function Component() {
                                     </Link>
                                 </div>
                             </div>
-                            <img
+                            <Image
                                 src="https://www.curiosityquench.com/_next/image?url=https%3A%2F%2Flh3.googleusercontent.com%2Fpw%2FAP1GczNTV486nBxfzYRbsNETqPVqAFhfH9zBypOZpu775N6bvwA8Bq1dJk2ZcW3STY8vCkp0DoCMHmYdtr_GQOtjUJZfVGIqAOb6Q5UybQLXuXkzD21f-LYVtkkXDGENxH9rlj4fnyYfG_AT-V34HmkT5TOt%3Dw945-h968-s-no-gm%3Fauthuser%3D0&w=640&q=75"
                                 width="550"
                                 height="550"
@@ -224,7 +225,7 @@ export default function Component() {
                             <div className="rounded-lg border bg-background p-6 shadow-sm">
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2">
-                                        <img
+                                        <Image
                                             src="/placeholder.svg"
                                             width="40"
                                             height="40"
@@ -238,7 +239,7 @@ export default function Component() {
                                         </div>
                                     </div>
                                     <p className="text-muted-foreground">
-                                        "Our customer satisfaction has skyrocketed since we\n implemented the chatbot SaaS platform. The
+                                        "Our customer satisfaction has skyrocketed since we implemented the chatbot SaaS platform. The
                                         ease of use and\n powerful features have been a game-changer for our\n business."
                                     </p>
                                 </div>
@@ -246,7 +247,7 @@ export default function Component() {
                             <div className="rounded-lg border bg-background p-6 shadow-sm">
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2">
-                                        <img
+                                        <Image
                                             src="/placeholder.svg"
                                             width="40"
                                             height="40"

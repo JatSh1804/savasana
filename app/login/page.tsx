@@ -1,4 +1,4 @@
-import { login, signup } from './actions'
+import { login } from './actions'
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,7 +26,8 @@ export default function LoginPage() {
             </div>
             <Button formAction={login} className="w-full">Sign in</Button>
             <div className="mt-4 text-center text-sm">
-              Don't have an account?{" "}
+              
+              Don't have an account? &nbsp;
               <Link href="/signup" className="underline" prefetch={false}>
                 Signup
               </Link>

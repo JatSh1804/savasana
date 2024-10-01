@@ -1,10 +1,10 @@
 // File: app/api/chat/route.ts
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
 
-export async function GET(request: NextRequest) {
+export async function GET() {
     const supabase = createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     // supabase.auth.admin.deleteUser()

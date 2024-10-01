@@ -11,14 +11,15 @@ import { signup } from "../login/actions"
 export default function Component() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
-    const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    const handleSubmit = async () => {
         // e.preventDefault()
         setLoading(true)
         setError("")
         try {
             // await new Promise((resolve) => setTimeout(resolve, 2000))
             // // console.log("Signup successful!")
-        } catch (err) {
+        } catch (err:any) {
+            console.log(err)
             setError("An error occurred. Please try again later.")
         } finally {
             setLoading(false)

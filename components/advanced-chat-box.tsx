@@ -1,7 +1,7 @@
 "use client"
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Pencil, Send, Settings, Triangle, Bot, Code2, Book, LifeBuoy, SquareUser, Rabbit, Bird, Turtle, Plus, Smile, Image, Mic, Check, X, EyeIcon } from 'lucide-react'
+import { Pencil, Send, Settings, Bot, LifeBuoy, SquareUser, Rabbit, Bird, Turtle, Plus, Smile,  Mic, Check, X, EyeIcon, ImageIcon } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -74,7 +74,7 @@ export function AdvancedChatBoxComponent() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingText, setEditingText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [currentGPT, setCurrentGPT] = useState<GPT>({ id: 1, name: 'ChatGPT', icon: <Bot /> });
+  const [currentGPT, setCurrentGPT] = useState<GPT>();
   const [generatedText, setGeneratedText] = useState('');
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
@@ -106,6 +106,7 @@ export function AdvancedChatBoxComponent() {
     };
 
     initUser();
+    setCurrentGPT({ id: 1, name: 'CustomGPT', icon: <Bot /> })
   }, []);
 
   const getUser = async (supabase: SupabaseClient) => {
@@ -122,7 +123,7 @@ export function AdvancedChatBoxComponent() {
   const fetchProfile = async (userId: string) => {
     if (!userId) return null;
 
-    let { data, error } = await supabase
+    const { data, error } = await supabase
       .from('user_profiles')
       .select('*')
       .eq('id', userId)
@@ -178,7 +179,7 @@ export function AdvancedChatBoxComponent() {
           console.log('Updating currentChatId', currentChatId);
         }
         else {
-          let newInstance: ChatInstance = { id: Date.now(), name: 'New Chat', messages: [] };
+          const newInstance: ChatInstance = { id: Date.now(), name: 'New Chat', messages: [] };
           setChatInstances([newInstance]);
           setCurrentChatId(newInstance.id);
           const { error } = await supabase
@@ -196,11 +197,11 @@ export function AdvancedChatBoxComponent() {
   }
 
 
-  const gpts: GPT[] = [
-    { id: 1, name: 'ChatGPT', icon: <Bot /> },
-    { id: 2, name: 'CodeGPT', icon: <Code2 /> },
-    { id: 3, name: 'WriterGPT', icon: <Book /> },
-  ];
+  // const gpts: GPT[] = [
+  //   { id: 1, name: 'CustomGPT', icon: <Bot /> },
+  //   { id: 2, name: 'CodeGPT', icon: <Code2 /> },
+  //   { id: 3, name: 'WriterGPT', icon: <Book /> },
+  // ];
 
   const [isRecording, setIsRecording] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -244,7 +245,7 @@ export function AdvancedChatBoxComponent() {
   };
   const sendMessage = async (currentChat: ChatInstance) => {
     try {
-      let messages = gatherChatHistory(currentChat);
+      const messages = gatherChatHistory(currentChat);
       console.log('debug: Client messages---->', messages);
 
       const response = await fetch('/api/chat', {
@@ -272,7 +273,7 @@ export function AdvancedChatBoxComponent() {
 
       const lastGeneratedMessage = await getIterableStream(response.body);
 
-      let generatedText: Message = { id: Date.now(), text: lastGeneratedMessage, sender: 'system' }
+      const generatedText: Message = { id: Date.now(), text: lastGeneratedMessage, sender: 'system' }
 
       setGeneratedText('');
       setIsGenerating(false);
@@ -538,7 +539,7 @@ export function AdvancedChatBoxComponent() {
     setEditingText('');
   };
 
-  
+
   const scrollToMessage = (id: number) => {
     messageRefs.current[id]?.scrollIntoView({ behavior: 'smooth' });
     console.log(messageRefs.current[id]?.classList.add('bg-cyan-200'))
@@ -589,6 +590,7 @@ export function AdvancedChatBoxComponent() {
   }, [currentChatId, chatInstances]);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log(event.target.files?.[0])
     // const file = event.target.files?.[0]
     // if (file) {
     //   const reader = new FileReader()
@@ -670,7 +672,7 @@ export function AdvancedChatBoxComponent() {
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col">
           <header className="bg-background border-b p-4 flex items-center justify-between">
-            <h1 className="text-xl font-semibold">{currentGPT.name}</h1>
+            <h1 className="text-xl font-semibold">{currentGPT?.name}</h1>
             <div className='flex gap-8'>
               <Drawer>
                 <DrawerTrigger asChild>
@@ -761,8 +763,8 @@ export function AdvancedChatBoxComponent() {
           <div className="flex-1 p-4 overflow-auto">
             {/* <AnimatePresence> */}
             <ScrollArea>
-              {currentChat?.messages.map((message) => (
-                <AnimatePresence>
+              {currentChat?.messages.map((message, index) => (
+                <AnimatePresence key={index}>
                   <motion.div
                     key={message.id}
                     initial={{ opacity: 0 }}
@@ -889,7 +891,7 @@ export function AdvancedChatBoxComponent() {
                 size="icon"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Image className="h-4 w-4" />
+                <ImageIcon className="h-4 w-4" />
               </Button>
               <Button
                 type="button"

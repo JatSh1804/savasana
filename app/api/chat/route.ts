@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
                 maxTokens: Math.min(modelOption?.maxTokens || 200, 250),
                 onChunk(event) {
                     chunk += event.chunk;
+                    console.log(chunk)
                 }, onFinish(event) {
                     console.log('Complete chunk:', event.text);
                 },

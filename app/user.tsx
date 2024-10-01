@@ -7,7 +7,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { User } from "@supabase/supabase-js"
 import { logout } from "./logout/actions"
-import { redirect } from "next/navigation"
+// import { redirect } from "next/navigation"
 export default function Profile() {
     const [user, setUser] = useState<User | null>(null);
 
