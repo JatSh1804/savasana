@@ -11,7 +11,6 @@ const openai = createOpenAI({
 });
 
 export async function POST(request: NextRequest) {
-    console.log(process.env.OPENAI_KEY)
     const supabase = createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     // supabase.auth.admin.deleteUser()
@@ -59,18 +58,17 @@ export async function POST(request: NextRequest) {
             }
 
 
-            // let chunk = '';
+            let chunk = '';
             const response = await streamText({
                 model: openai(modelOption?.model || 'llama-3.2-1b-preview'),
                 temperature: modelOption?.temperature || 0.7,
                 system: modelOption?.system || "You are a chef, also knows bartending, and loves coffee, you are really funny and cute.",
                 messages,
                 maxTokens: Math.max(modelOption?.maxTokens || 200, 250),
-                // onChunk(event) {
-                //     // chunk += event.chunk;
-                //     // console.log(chunk)
-                // },
-                 onFinish(event) {
+                onChunk(event) {
+                    chunk += event.chunk;
+                    console.log(chunk)
+                }, onFinish(event) {
                     console.log('Complete chunk:', event.text);
                 },
             });

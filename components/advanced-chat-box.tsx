@@ -1,7 +1,7 @@
 "use client"
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Pencil, Send, Settings, Bot, LifeBuoy, SquareUser, Rabbit, Bird, Turtle, Plus, Smile,  Mic, Check, X, EyeIcon, ImageIcon } from 'lucide-react'
+import { Pencil, Send, Settings, Bot, LifeBuoy, SquareUser, Rabbit, Bird, Turtle, Plus, Smile, Mic, Check, X, EyeIcon, ImageIcon } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -197,11 +197,6 @@ export function AdvancedChatBoxComponent() {
   }
 
 
-  // const gpts: GPT[] = [
-  //   { id: 1, name: 'CustomGPT', icon: <Bot /> },
-  //   { id: 2, name: 'CodeGPT', icon: <Code2 /> },
-  //   { id: 3, name: 'WriterGPT', icon: <Book /> },
-  // ];
 
   const [isRecording, setIsRecording] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -322,44 +317,6 @@ export function AdvancedChatBoxComponent() {
 
   };
 
-
-  // const handleSendMessage = async () => {
-  //   if (inputMessage.trim() && !isGenerating) {
-  //     const newMessage: Message = {
-  //       id: Date.now(),
-  //       text: inputMessage,
-  //       sender: 'user'
-  //     };
-
-  //     setIsGenerating(true);
-  //     setInputMessage('');
-
-  //     // Update state using setState
-  //     setChatInstances(prevInstances => {
-  //       const updatedInstances = prevInstances.map(instance => {
-  //         if (instance.id === currentChatId) {
-  //           return {
-  //             ...instance,
-  //             messages: [...instance.messages, newMessage]
-  //           };
-  //         }
-  //         return instance;
-  //       });
-
-  //       // Find the updated current chat instance
-  //       const updatedCurrentChat = updatedInstances.find(chat => chat.id === currentChatId);
-
-  //       // Call sendMessage with the updated chat instance
-  //       if (updatedCurrentChat) {
-  //         sendMessage(updatedCurrentChat);
-  //       }
-
-  //       return updatedInstances;
-  //     });
-  //   }
-  // };
-
-
   const handleSendMessage = async () => {
     if (inputMessage.trim() && !isGenerating) {
       const newMessage: Message = {
@@ -445,44 +402,6 @@ export function AdvancedChatBoxComponent() {
     setEditingText(newText);
   };
 
-  // const handleRegenerateFromEdit = (editedMessageId: number) => {
-  //   setChatInstances(prevInstances => {
-  //     const updatedInstances = prevInstances.map(instance => {
-  //       if (instance.id === currentChatId) {
-  //         const editedMessageIndex = instance.messages.findIndex(msg => msg.id === editedMessageId);
-  //         if (editedMessageIndex !== -1) {
-  //           const newMessage: Message = {
-  //             id: Date.now(),
-  //             text: editingText,
-  //             sender: 'user',
-  //             referencedMessageId: editedMessageId,
-  //           };
-  //           const updatedMessages = [
-  //             ...instance.messages,
-  //             newMessage,
-  //           ];
-  //           return { ...instance, messages: updatedMessages };
-  //         }
-  //       }
-  //       return instance;
-  //     });
-
-  //     // Find the updated current chat instance
-  //     const updatedCurrentChat = updatedInstances.find(chat => chat.id === currentChatId);
-
-  //     // Call sendMessage with the updated chat instance
-  //     if (updatedCurrentChat) {
-  //       setIsGenerating(true);
-  //       sendMessage(updatedCurrentChat);
-  //     }
-
-  //     return updatedInstances;
-  //   });
-
-  //   // Clear editing state
-  //   setEditingId(null);
-  //   setEditingText('');
-  // };
 
   const handleRegenerateFromEdit = async (editedMessageId: number) => {
     setIsGenerating(true);
@@ -591,19 +510,6 @@ export function AdvancedChatBoxComponent() {
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     console.log(event.target.files?.[0])
-    // const file = event.target.files?.[0]
-    // if (file) {
-    //   const reader = new FileReader()
-    //   reader.onload = (e) => {
-    //     const newMessage: Message = {
-    //       id: Date.now(),
-    //       content: { type: 'image', url: e.target?.result as string },
-    //       sender: 'user'
-    //     }
-    //     addMessageToCurrent(newMessage)
-    //   }
-    //   reader.readAsDataURL(file)
-    // }
   }
 
   const handleAudioRecording = () => {
@@ -729,7 +635,7 @@ export function AdvancedChatBoxComponent() {
 
                       <div className="grid gap-2">
                         <Label htmlFor="top-p">Max Tokens</Label>
-                        <Input id="top-p" value={max_tokens} onChange={(e) => setMaxTokens(Number(e.target.value))} type="number" placeholder="100" />
+                        <Input id="top-p" max={1200} value={max_tokens} onChange={(e) => setMaxTokens(Number(e.target.value))} type="number" placeholder="100" />
                       </div>
                     </form>
                   </div>

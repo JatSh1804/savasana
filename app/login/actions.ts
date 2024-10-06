@@ -36,13 +36,13 @@ export async function signup(formData: FormData) {
     email: formData.get('email') as string,
     password: formData.get('password') as string,
   }
-  console.log('received user data-->', data)
+
   const { error } = await supabase.auth.signUp(data)
-  // console.log(user)
+
   if (error) {
     redirect('/error')
   }
 
   revalidatePath('/', 'layout')
-  redirect('/chat')
+  redirect('/')
 }

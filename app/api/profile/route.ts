@@ -18,8 +18,8 @@ export async function GET() {
     try {
         const { data: userProfile, error: profileError } = await supabase
             .from('user_profiles')
-            .select('tokens')
-            .eq('id', user.id)
+            .select('tokens_remaining')
+            .eq('auth_id', user.id)
             .single();
 
 
@@ -29,7 +29,7 @@ export async function GET() {
             return new NextResponse('User profile not found', { status: 404 });
         }
 
-        return new NextResponse(JSON.stringify({ tokens: userProfile.tokens }), {
+        return new NextResponse(JSON.stringify({ tokens: userProfile.tokens_remaining }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
         });
