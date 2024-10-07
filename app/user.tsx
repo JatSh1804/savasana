@@ -26,7 +26,7 @@ export default function Profile() {
     }, [])
 
     return (user ? <>
-        <Link href="/chat" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
+        <Link href="/dev/chat" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
             Chat
         </Link>
         <DropdownMenu>

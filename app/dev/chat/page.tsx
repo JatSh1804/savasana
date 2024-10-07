@@ -1,7 +1,7 @@
 "use client"
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Pencil, Send, Settings, Bot, LifeBuoy, SquareUser, Rabbit, Bird, Turtle, Plus, Smile, Mic, Check, X, ImageIcon, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Pencil, Send, Settings, Bot, LifeBuoy, SquareUser, Rabbit, Bird, Turtle, Plus, Smile, Mic, Check, X, ImageIcon, Trash2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -45,14 +45,15 @@ interface Branch {
     branch_name: string;
     branch_messages: Message[] | [];
     parent_branch_id?: string;
-    // children: Branch[];
+    children: string[];
 }
 
 interface ChatSession {
     user_chat_id: string;
-    chat_topic?: string;
+    chat_topic: string;
     default_branch_id: number;
     last_branch_created_branch_id: string;
+    modeloption: ModelOption;
     // rootBranch: Branch;
     // currentBranch?: Branch; // Pointer to the currently selected branch
 }
@@ -76,6 +77,7 @@ interface UserProfile {
     tokens: number;
 }
 interface ModelOption {
+    system: string;
     temperature: number;
     context?: string
     model: 'llama-3.2-1b-preview' | 'mixtral-8x7b-32768' | 'gemma-7b-it';
@@ -89,7 +91,7 @@ export default function AdvancedChatBoxComponent() {
     const { toast } = useToast()
 
     const [chatSessions, setChatSessions] = useState<ChatSession[] | null>(null);
-    const [currentSessionId, setCurrentSessionId] = useState<string | number | null>(null);
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
     const [sessionBranches, setSessionBranches] = useState<{ [branch_id: string]: Branch } | null>(null);
     // Will have Branch[] all the branch data for this chat session.
@@ -116,14 +118,16 @@ export default function AdvancedChatBoxComponent() {
     // const [currentChat, setCurrentChat] = useState<ChatInstance | undefined>();
 
     const [editingText, setEditingText] = useState<string>('');
-    const [editingMessageId, setEditingId] = useState<string>();
 
-    const [modelOption, setModelOption] = useState<ModelOption>({ temperature: 0.7, max_tokens: 100, model: 'llama-3.2-1b-preview' })
+    const [modelOption, setModelOption] = useState<ModelOption>({ system: '', temperature: 0.7, max_tokens: 100, model: 'llama-3.2-1b-preview' })
     const [temperature, setTemperature] = useState(0.7);
     const [max_tokens, setMaxTokens] = useState(100);
     const [fine_tune, setFineTune] = useState('')
-    const [model, setModel] = useState('');
+    // const [model, setModel] = useState<ModelOption>('');
 
+    const [editingMessageId, setEditingId] = useState<string>();
+    const [editingTitleId, setEditedTitleId] = useState<string>('')
+    const [newEditedTitle, setNewTitle] = useState<string>('');
 
     const getIterableStream = async (body: ReadableStream<Uint8Array>, isNormalSendMessage: boolean) => {
         const reader = body.getReader();
@@ -191,6 +195,16 @@ export default function AdvancedChatBoxComponent() {
         console.log(currentSessionId);
         if (currentSessionId !== null) {
             setDisabled(true);
+            const activeSession = chatSessions?.find(session => session.user_chat_id === currentSessionId);
+
+            console.log('updated the session---->', activeSession)
+            if (activeSession) {
+                if (activeSession.modeloption) {
+                    setModelOption(activeSession.modeloption);
+                } else {
+                    setModelOption({ system: '', temperature: 0.7, max_tokens: 100, model: 'llama-3.2-1b-preview' });
+                }
+            }
             fetchBranchesForSession(currentSessionId);
         }
     }, [currentSessionId])
@@ -229,47 +243,6 @@ export default function AdvancedChatBoxComponent() {
         return;
     }
 
-
-
-    // function transformBranchMessages(
-    //     currentBranchId: string,
-    //     sessionBranches: SessionBranches
-    // ): Message[] {
-    //     // This array will store all messages that should be rendered for the current branch
-    //     // Helper function to recursively process branches and collect their messages
-    //     function collectMessagesFromBranch(branchId: string): Message[] {
-    //         const currentBranchMessages: Message[] = [];
-    //         const branch = sessionBranches[branchId];
-    //         if (!branch) { console.log("Branch not found"); return currentBranchMessages }; // Branch not found
-
-    //         // Iterate through each message in the branch
-    //         branch.branch_messages.forEach((message, index) => {
-    //             // Attach branch_id to each message for tracking
-    //             const transformedMessage: Message = {
-    //                 ...message,
-    //                 branch_id: branchId,
-    //                 other_branches: message.other_branches ?? [] // Ensure otherBranchIds is initialized
-    //             };
-    //             currentBranchMessages.push(transformedMessage);
-    //         });
-    //         if (branch.parent_branch_id != null) {
-    //             const previousBranchMessages = collectMessagesFromBranch(branch.parent_branch_id);
-    //             if (previousBranchMessages.length > 0) {
-    //                 currentBranchMessages.unshift(...previousBranchMessages);
-    //             }
-    //         }
-    //         return currentBranchMessages;
-    //     }
-    //     const branchMessages = collectMessagesFromBranch(currentBranchId);
-    //     console.log('transformed branch Array to render-->', branchMessages)
-    //     setCurrentBranchMessages(branchMessages)
-    //     return branchMessages;
-    // }
-
-    // Example usage in a React component
-
-    //This function will handle initial session change rendering as well as branch change render
-
     function transformBranchMessages(
         currentBranchId: string,
         sessionBranches: SessionBranches
@@ -305,9 +278,9 @@ export default function AdvancedChatBoxComponent() {
 
             const messages = branch.branch_messages.map(msg => ({ ...msg, branch_id: msg.branch_id }));
 
-            const firstMessage = branch.branch_messages[0];
-            if (firstMessage && firstMessage.other_branches.length > 0) {
-                const childBranchId = firstMessage.other_branches[0];
+            // const firstMessage = branch.branch_messages[0];
+            if (branch.children && branch.children.length > 0) {
+                const childBranchId = branch.children[0];
                 const childMessages = collectChildMessages(childBranchId, sessionBranches);
                 return [...messages, ...childMessages];
             }
@@ -326,7 +299,7 @@ export default function AdvancedChatBoxComponent() {
         // const currentMessages = currentBranch.branch_messages.map(msg => ({ ...msg, branch_id: currentBranchId }));
         // console.log('currentMessages--->', currentMessages);
 
-        const childBranch = currentBranch?.branch_messages[0]?.other_branches[1];
+        const childBranch = currentBranch.children[0];
         // consol
         let childMessages: Message[] = []
         console.log('childBranch--->', childBranch)
@@ -435,6 +408,40 @@ export default function AdvancedChatBoxComponent() {
         return profile;
     };
 
+    const setModelSetting = (sessionId: string) => {
+        if (sessionId && sessionId == '') {
+            handleError(new Response("Couldn't update the Configuration!", { status: 400 }));
+            return;
+        };
+
+        const updateModelOption = async (sessionId: string, modelOption: ModelOption) => {
+            try {
+                const { data, error } = await supabase
+                    .from('user_chats')
+                    .update({ modeloption: modelOption })
+                    .eq('user_chat_id', sessionId);
+
+                if (error) {
+                    console.error('Error updating model option:', error);
+                    return null;
+                }
+                handleSuccess()
+                return data;
+            } catch (error) {
+                console.error('Unexpected error updating model option:', error);
+                return null;
+            }
+        };
+
+        updateModelOption(sessionId, modelOption);
+    }
+    const handleSuccess = () => {
+        toast({
+            title: "Success!",
+            description: "The operation was completed successfully.",
+            variant: 'success'
+        });
+    };
 
     const fetchChatSessions = async () => {
         try {
@@ -535,12 +542,7 @@ export default function AdvancedChatBoxComponent() {
                 body: JSON.stringify({
                     messages,
                     branch_id: currentActiveBranch,
-                    modelOption: {
-                        system: fine_tune,
-                        model,
-                        temperature: temperature || 0.7,
-                        max_tokens: max_tokens || 100,
-                    },
+                    modelOption
                 }),
             });
 
@@ -622,12 +624,7 @@ export default function AdvancedChatBoxComponent() {
                 user_chat_id,
                 text: editedText,
                 originalMessageId: originalMessageId,
-                modelOption: {
-                    system: fine_tune,
-                    model,
-                    temperature: temperature || 0.7,
-                    max_tokens: max_tokens || 100,
-                },
+                modelOption,
             }),
         });
         if (!response.ok) {
@@ -649,6 +646,29 @@ export default function AdvancedChatBoxComponent() {
         setEditingText('');
     };
 
+    const updateNewTitle = async () => {
+        const { data, error } = await supabase
+            .from('user_chats')
+            .update({ chat_topic: newEditedTitle })
+            .eq('user_chat_id', editingTitleId);
+
+        if (error) {
+            console.error('Error updating chat topic:', error);
+            return;
+        }
+
+        setChatSessions(prevSessions => {
+            if (!prevSessions) return prevSessions;
+            return prevSessions.map(session =>
+                session.user_chat_id === editingTitleId
+                    ? { ...session, chat_topic: newEditedTitle }
+                    : session
+            );
+        });
+
+        setEditedTitleId('');
+        setNewTitle('');
+    }
 
     const deleteChat = async (sessionId: string | number) => {
 
@@ -693,7 +713,7 @@ export default function AdvancedChatBoxComponent() {
 
         const { default_branch_id, user_chat_id, chat_topic, last_branch_created_branch_id } = data;
 
-        setChatSessions((prev) => [{ default_branch_id, user_chat_id, chat_topic, last_branch_created_branch_id }, ...(prev || [])]);
+        setChatSessions((prev) => [{ default_branch_id, user_chat_id, chat_topic, last_branch_created_branch_id, modeloption: { temperature: 0.7, max_tokens: 100, model: 'llama-3.2-1b-preview', system: '' } }, ...(prev || [])]);
         setCurrentSessionId(user_chat_id);
         setCurrentActiveBranch(last_branch_created_branch_id)
         setInputMessage('');
@@ -770,7 +790,25 @@ export default function AdvancedChatBoxComponent() {
                     <ScrollArea className="flex-1 overflow-y-auto">
                         {chatSessions?.map((sessions, index) => (
                             <div key={sessions.user_chat_id} className="relative mb-2 group">
-                                <Button
+                                {editingTitleId === sessions.user_chat_id ? (
+                                    // <form>
+                                    <>
+                                        <div className='flex '>
+                                            <Input
+                                                // ref={editInputRef}
+                                                value={newEditedTitle}
+                                                onChange={(e) => setNewTitle(e.target.value)}
+                                                // onBlur={() => { setEditedTitleId('') }}
+                                                // onBlur={() => saveEditedTitle(instance.id)}
+                                                className="w-full pr-8"
+                                            ></Input>
+                                            <Button onClick={() => { updateNewTitle() }}>
+                                                <Check />
+                                            </Button>
+                                        </div>
+                                    </>
+                                ) : <> <Button
+                                    onDoubleClick={() => { console.log('double clicked', sessions.chat_topic); setEditedTitleId(sessions.user_chat_id); setNewTitle(sessions.chat_topic) }}
                                     onClick={() => {
                                         setCurrentSessionId(sessions.user_chat_id);
                                         setCurrentActiveBranch(sessions.last_branch_created_branch_id);
@@ -780,30 +818,31 @@ export default function AdvancedChatBoxComponent() {
                                 >
                                     {sessions.chat_topic}
                                 </Button>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className={`absolute right-0 top-0 bottom-0 opacity-0 group-hover:opacity-100  text-red-600 hover:text-red-800 hover:bg-transparent  transition-opacity`}
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                Do you want to delte this chat history?
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => deleteChat(sessions.user_chat_id)}>Continue</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className={`absolute right-0 top-0 bottom-0 opacity-0 group-hover:opacity-100  text-red-600 hover:text-red-800 hover:bg-transparent  transition-opacity`}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Do you want to delte this chat history?
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => deleteChat(sessions.user_chat_id)}>Continue</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog></>
+                                }
                             </div>
                         ))}
                     </ScrollArea>
@@ -853,12 +892,12 @@ export default function AdvancedChatBoxComponent() {
                                         <form className="grid items-start gap-4">
                                             <div className="grid gap-2">
                                                 <Label htmlFor="top-k">Create a GPT</Label>
-                                                <Input id="top-k" value={fine_tune} onChange={(e) => setFineTune(e.target.value)} type="text" placeholder="You are a chef, also knows bartending, and loves coffee, you are really funny and cute." />
+                                                <Input id="top-k" value={modelOption.system} onChange={(e) => setModelOption(prev => ({ ...prev, system: e.target.value }))} type="text" placeholder="You are a chef, also knows bartending, and loves coffee, you are really funny and cute." />
                                             </div>
 
                                             <div className="grid gap-2">
                                                 <Label htmlFor="model">Model</Label>
-                                                <Select onValueChange={(e) => { setModel(e) }}>
+                                                <Select onValueChange={(value: 'llama-3.2-1b-preview' | 'mixtral-8x7b-32768' | 'gemma-7b-it') => { setModelOption(prev => ({ ...prev, model: value })) }} value={modelOption.model}>
                                                     <SelectTrigger id="model">
                                                         <SelectValue placeholder="Select a model" />
                                                     </SelectTrigger>
@@ -891,8 +930,10 @@ export default function AdvancedChatBoxComponent() {
 
                                             <div className="grid gap-2">
                                                 <Label htmlFor="top-p">Max Tokens</Label>
-                                                <Input id="top-p" max={1200} value={max_tokens} onChange={(e) => setMaxTokens(Number(e.target.value))} type="number" placeholder="100" />
+                                                <Input id="top-p" max={1200} value={modelOption.max_tokens} onChange={(e) => setMaxTokens(Number(e.target.value))} type="number" placeholder="100" />
                                             </div>
+                                            <Button onClick={(e) => { e.preventDefault(); setModelSetting(currentSessionId || '') }} >Update Configuration!</Button>
+
                                         </form>
                                     </div>
                                 </DrawerContent>

@@ -1,5 +1,3 @@
-// import { supabase } from '../../utils/supabaseClient';
-
 import { createClient } from "@/utils/supabase/server";
 import { createOpenAI } from "@ai-sdk/openai";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -42,8 +40,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Invalid or missing newMessageText' }, { status: 400 });
         }
 
-        // let multiEdit;
-        // let originalBranch, newBranchA, newBranchB;
         console.log('Text to be used in new Branch-->', newMessageText)
 
         const branchesResult = await handleEditAndCreateBranches(supabase, originalMessageId, newMessageText, user_chat_id);
@@ -55,6 +51,7 @@ export async function POST(request: NextRequest) {
         console.log('new_branch_a', newBranchA);
         console.log('new_branch_b', newBranchB);
 
+        const mergedMessage = [...messages.map((msg: Message) => ({ role: msg.sender, content: msg.text })), { role: 'user', content: newMessageText }];
 
         // Handle the case where only originalBranch and newBranchA are returned
         if (!newBranchB) {
@@ -77,7 +74,38 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: errorMsg }, { status: 500 });
             }
 
-            return NextResponse.json(updatedBranches, { status: 200 });
+            const response = await streamText({
+                model: openai(modelOption?.model || 'llama-3.2-1b-preview'),
+                temperature: modelOption?.temperature || 0.7,
+                system: modelOption?.system || "You are a chef, also knows bartending, and loves coffee, you are really funny and cute.",
+                messages: mergedMessage,
+                maxTokens: Math.max(modelOption?.maxTokens || 200, 250),
+
+                onFinish({ text }) {
+                    // Step 6: Add the full LLM response to the database
+                    console.log("onFinish Text:", text);
+                    // console.log(fullResponse);
+                    supabase
+                        .from('branch_messages')
+                        .insert([
+                            { branch_id: newBranchA?.branch_id || newBranchA?.branch_id, sender: 'system', text }
+                        ])
+                        .then(({ error }) => {
+                            if (error) console.error('Error inserting system message:', error);
+                        });
+                },
+            });
+            const Branches = new StreamData()
+            Branches.append(updatedBranches)
+            // Return the streaming response
+            return response.toDataStreamResponse({
+                // data: updatedBranches,
+                headers: {
+                    'Content-Type': 'text/event-stream',
+                }
+            })
+
+            // return NextResponse.json(updatedBranches, { status: 200 });
         }
 
 
@@ -104,9 +132,8 @@ export async function POST(request: NextRequest) {
 
 
         // Return the data from the RPC function
-        
+
         // const extract = messages.map((msg: Message) => ({ role: msg.sender, content: msg.text }))
-        const mergedMessage = [...messages.map((msg: Message) => ({ role: msg.sender, content: msg.text })), { role: 'user', content: newMessageText }];
 
         console.log('message merged-->', mergedMessage)
 
@@ -124,7 +151,7 @@ export async function POST(request: NextRequest) {
                 supabase
                     .from('branch_messages')
                     .insert([
-                        { branch_id: newBranchA?.branch_id, sender: 'system', text }
+                        { branch_id: newBranchB?.branch_id || newBranchA?.branch_id, sender: 'system', text }
                     ])
                     .then(({ error }) => {
                         if (error) console.error('Error inserting system message:', error);

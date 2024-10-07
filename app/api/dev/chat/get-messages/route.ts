@@ -3,7 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { createOpenAI } from "@ai-sdk/openai";
-import { StreamData, streamText } from "ai";
+import { streamText } from "ai";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 
@@ -35,23 +35,27 @@ export async function GET(request: NextRequest) {
         if (authError || !user) {
             return new NextResponse('Unauthorized', { status: 401 });
         }
+
         const url = request.nextUrl;
         const sessionId = url.searchParams.get('sessionId');
 
         if (sessionId) {
             const branchesWithMessages = await fetchBranchesWithMessages(supabase, sessionId);
 
-            if (!branchesWithMessages) return [];
+            if (!branchesWithMessages) {
+                return NextResponse.json({ branches: [] }); // Return an empty array instead of an empty Response
+            }
 
-            return NextResponse.json({ branches: branchesWithMessages })
+            return NextResponse.json({ branches: branchesWithMessages });
         }
-    }
-    catch (error) {
+
+        // Return a default response if sessionId is not provided
+        return NextResponse.json({ branches: [] }); // or some meaningful default
+    } catch (error) {
         console.error('Error in chat API:', error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
-
 
 
 const openai = createOpenAI({
@@ -60,9 +64,9 @@ const openai = createOpenAI({
     apiKey: process.env.OPENAI_KEY ?? 'your-api-key-here',
 });
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<Response> {
     const supabase = createClient()
-    const { branch_id, messages, modelOption } = await request.json();
+    const { messages, modelOption } = await request.json();
 
 
     try {
@@ -81,7 +85,7 @@ export async function POST(request: NextRequest) {
                 return new NextResponse('Unauthorized', { status: 401 });
             } else if (error.message === 'Insufficient tokens') {
                 console.error('Error: You do not have enough tokens.');
-                return new NextResponse(error.message, { status: 403 }); return;
+                return new NextResponse(error.message, { status: 403 });
             } else {
                 console.error('An unexpected error occurred:', error.message);
                 return new NextResponse('An unexpected error occurred', { status: 405 })
@@ -101,6 +105,7 @@ export async function POST(request: NextRequest) {
 
         // const data = new StreamData()
 
+        console.log('modelOption--->', modelOption)
         const response = await streamText({
             model: openai(modelOption?.model || 'llama-3.2-1b-preview'),
             temperature: modelOption?.temperature || 0.7,
