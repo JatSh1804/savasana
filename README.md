@@ -74,34 +74,33 @@ The core challenge was to develop an architecture that can handle branching in c
    ```bash
    git clone <repo-url>
    cd <repo-directory>
-Install dependencies:
+2. Install dependencies:
 
-bash
-Copy code
-npm install
-Set up environment variables:
+   ```bash
+   npm install
+   ```
+3. Set up environment variables:
 
-Create a .env.local file and add your Supabase keys and any other necessary environment variables, including those required for Ollama model integration:
-bash
-Copy code
-NEXT_PUBLIC_SUPABASE_URL=<YOUR_SUPABASE_URL>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<YOUR_SUPABASE_ANON_KEY>
-OLLAMA_API_KEY=<YOUR_OLLAMA_API_KEY>
-Run the development server:
+   Create a .env.local file and add your Supabase keys and any other necessary environment variables, including those required for Ollama model integration:
 
-bash
-Copy code
-npm run dev
-Access the application at http://localhost:3000.
+
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=<YOUR_SUPABASE_URL>
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<YOUR_SUPABASE_ANON_KEY>
+   OLLAMA_API_KEY=<YOUR_OLLAMA_API_KEY>
+   ```
+   Run the development server:
+
+   ```bash
+      npm run dev 
+   ```
+
+   Access the application at http://localhost:3000.
 
 Conclusion
 This project demonstrates a complex yet efficient approach to conversation branching in GPT-based chat applications. By leveraging Next.js, TypeScript, Supabase, and the flexibility to integrate with AI models like Ollama, we have built a scalable and dynamic architecture that allows users to explore different conversational outcomes through a flexible branching system. This approach can easily be extended to support even more advanced features and customizations.
 
 Future Enhancements
 Real-time Updates: Implement real-time updates for chat sessions using Supabase’s real-time capabilities.
-Improved UI/UX: Enhance the user interface for better visualization of the chat branching tree.
-Advanced AI Integration: Continue expanding integration options with other AI models, including more powerful conversational models from Ollama, for a more versatile chat experience.
-python
-Copy code
 
 This version incorporates the integration of Ollama models, outlining how the architect
