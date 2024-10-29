@@ -183,13 +183,14 @@ export default function AdvancedChatBoxComponent() {
                 console.log('profile received-->', profile)
                 if (profile) {
                     fetchChatSessions();
-                    setDisabled(false);
+                    // setDisabled(false);
                 }
             }
         };
 
         initUser();
     }, []);
+
 
     useEffect(() => {
         console.log(currentSessionId);
@@ -206,6 +207,9 @@ export default function AdvancedChatBoxComponent() {
                 }
             }
             fetchBranchesForSession(currentSessionId);
+        }
+        if (!currentSessionId) {
+            setDisabled(true);
         }
     }, [currentSessionId])
 

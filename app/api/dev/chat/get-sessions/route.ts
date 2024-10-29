@@ -7,7 +7,7 @@ const fetchAllChatSessions = async (supabase: SupabaseClient, userId: string) =>
 
     const { data, error } = await supabase
         .from('user_chats')
-        .select('*')
+        .select('chat_topic, user_chat_id, default_branch_id, last_branch_created_branch_id, modeloption')
         .eq('user_id', userId);
 
     if (error) {

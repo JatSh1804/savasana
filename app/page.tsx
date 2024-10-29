@@ -14,10 +14,10 @@ export default function Component() {
                 <nav className="ml-auto flex gap-4 sm:gap-6 items-center">
                     {/* <Link href="#" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
                         Features
-                    </Link>
-                    <Link href="#" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
-                        Pricing
                     </Link> */}
+                    <Link href="/subscription" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
+                        Pricing
+                    </Link>
                     <Profile />
 
                 </nav>
