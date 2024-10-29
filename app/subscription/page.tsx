@@ -124,7 +124,7 @@ export default function EnhancedMembershipPage() {
             setTimeout(() => {
                 redirect('/app/dev/chat')
             }, 1000)
-        } catch (error: Error) {
+        } catch (error: any) {
             setError(error.message);
         } finally {
             setLoading(false);
