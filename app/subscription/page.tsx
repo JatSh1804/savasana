@@ -78,7 +78,7 @@ const navItems: { name: string; href: string }[] = [
 ]
 
 export default function EnhancedMembershipPage() {
-    const [sidebarOpen, setSidebarOpen] = useState(true)
+    const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
     const supabase = createClient();
     const [success, setSuccess] = useState<boolean | null>(null)
     const [subscription, setSubscription] = useState(null);
