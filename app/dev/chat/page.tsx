@@ -23,6 +23,8 @@ import ChevronBox from './chevronBox'
 import { useToast } from "@/hooks/use-toast";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import AptosClient from '@/utils/aptos/client'
+
 
 interface ChatInstance {
     id: number;
@@ -89,6 +91,7 @@ const supabase = createClient();
 
 export default function AdvancedChatBoxComponent() {
     const { toast } = useToast()
+
 
     const [chatSessions, setChatSessions] = useState<ChatSession[] | null>(null);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -174,6 +177,7 @@ export default function AdvancedChatBoxComponent() {
     };
 
     useEffect(() => {
+        AptosClient();
         const initUser = async () => {
             const user = await getUser(supabase);
             if (!user) {
@@ -187,8 +191,13 @@ export default function AdvancedChatBoxComponent() {
                 }
             }
         };
+        const blockchainInit = async () => {
+            const aptos = await AptosClient();
+            console.log('Initializing Aptos')
+        }
 
         initUser();
+        blockchainInit();
     }, []);
 
 
