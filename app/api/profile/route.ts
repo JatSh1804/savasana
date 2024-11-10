@@ -1,6 +1,6 @@
 // File: app/api/chat/route.ts
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
 
@@ -38,4 +38,7 @@ export async function GET() {
         console.error('Error in chat API:', error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
+}
+export async function POST(request:NextRequest) {
+    return new NextResponse(JSON.stringify({hello:'what is up??'}))
 }

@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     reactStrictMode: false,
+    experimental: {
+        serverActions: {
+            allowedOrigins: ['symmetrical-space-giggle-v97wp5jpjv62prgv-3000.com'],
+            allowedForwardedHosts: ['symmetrical-space-giggle-v97wp5jpjv62prgv-3000.com'],
+        },
+    },
     eslint: {
         ignoreDuringBuilds: true,
     },
