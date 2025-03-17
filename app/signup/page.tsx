@@ -7,24 +7,35 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { signup } from "../login/actions"
+import GoogleLoginButton from "@/components/auth/google-login-button"
+import { Loader2 } from "lucide-react"
 
 export default function Component() {
     const [loading, setLoading] = useState(false)
-    const [error, setError] = useState("")
-    const handleSubmit = async () => {
-        // e.preventDefault()
+    const [error, setError] = useState<string | null>(null)
+    const [passwordMatch, setPasswordMatch] = useState(true)
+    const [password, setPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    
+    const handleSignup = async (formData: FormData) => {
+        // Check if passwords match
+        if (password !== confirmPassword) {
+            setPasswordMatch(false)
+            return
+        }
+        
         setLoading(true)
-        setError("")
-        try {
-            // await new Promise((resolve) => setTimeout(resolve, 2000))
-            // // console.log("Signup successful!")
-        } catch (err:any) {
-            console.log(err)
-            setError("An error occurred. Please try again later.")
-        } finally {
+        setError(null)
+        
+        const result = await signup(formData)
+        
+        if (result?.error) {
+            setError(result.error)
             setLoading(false)
         }
+        // No need to handle success case as the signup action will redirect
     }
+
     return (
         <div className="flex justify-center items-center h-screen">
             <Card className="mx-auto max-w-sm">
@@ -33,8 +44,9 @@ export default function Component() {
                     <CardDescription>Enter your details below to create a new account</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form>
-                        {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>}
+                    {error && <div className="bg-destructive/15 text-destructive p-3 rounded-md text-sm mb-4">{error}</div>}
+                    {!passwordMatch && <div className="bg-destructive/15 text-destructive p-3 rounded-md text-sm mb-4">Passwords do not match</div>}
+                    <form action={handleSignup}>
                         <div className="grid gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="email">Email</Label>
@@ -44,27 +56,51 @@ export default function Component() {
                                 <div className="flex items-center">
                                     <Label htmlFor="password">Password</Label>
                                 </div>
-                                <Input id="password" type="password" name="password" required />
+                                <Input 
+                                    id="password" 
+                                    type="password" 
+                                    name="password" 
+                                    required 
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                />
                             </div>
                             <div className="grid gap-2">
                                 <div className="flex items-center">
                                     <Label htmlFor="confirm-password">Confirm Password</Label>
                                 </div>
-                                <Input id="confirm-password" type="password" required />
+                                <Input 
+                                    id="confirm-password" 
+                                    type="password" 
+                                    required 
+                                    value={confirmPassword}
+                                    onChange={(e) => {
+                                        setConfirmPassword(e.target.value)
+                                        setPasswordMatch(true) // Reset the error when typing
+                                    }}
+                                />
                             </div>
-                            <Button className="w-full" disabled={loading} formAction={signup} onClick={handleSubmit}>
+                            <Button className="w-full" disabled={loading} type="submit">
                                 {loading ? (
                                     <div className="flex items-center justify-center">
-                                        <LoaderIcon className="w-5 h-5 animate-spin" />
-                                        <span className="ml-2">Signing Up...</span>
+                                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                                        <span>Signing Up...</span>
                                     </div>
                                 ) : (
                                     "Sign Up"
                                 )}
                             </Button>
-                            {/* <Button variant="outline" className="w-full">
-                            Sign Up with Google
-                        </Button> */}
+                            
+                            <div className="relative my-2">
+                              <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t" />
+                              </div>
+                              <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                              </div>
+                            </div>
+                            
+                            <GoogleLoginButton label="Sign up with Google" />
                         </div>
                         <div className="mt-4 text-center text-sm">
                             Already have an account?{" "}
@@ -76,31 +112,5 @@ export default function Component() {
                 </CardContent>
             </Card>
         </div>
-    )
-}
-
-function LoaderIcon(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M12 2v4" />
-            <path d="m16.2 7.8 2.9-2.9" />
-            <path d="M18 12h4" />
-            <path d="m16.2 16.2 2.9 2.9" />
-            <path d="M12 18v4" />
-            <path d="m4.9 19.1 2.9-2.9" />
-            <path d="M2 12h4" />
-            <path d="m4.9 4.9 2.9 2.9" />
-        </svg>
     )
 }

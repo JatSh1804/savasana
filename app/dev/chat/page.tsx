@@ -1,7 +1,7 @@
 "use client"
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Pencil, Send, Settings, Bot, LifeBuoy, SquareUser, Rabbit, Bird, Turtle, Plus, Smile, Mic, Check, X, ImageIcon, Trash2, FileSpreadsheet, UploadCloud, BarChart3 } from 'lucide-react'
+import { Pencil, Send, Settings, Bot, LifeBuoy, SquareUser, Rabbit, Bird, Turtle, Plus, Smile, Mic, Check, X, ImageIcon, Trash2, FileSpreadsheet, UploadCloud, BarChart3, Loader2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -106,6 +106,7 @@ export default function AdvancedChatBoxComponent() {
 
     const [chatSessions, setChatSessions] = useState<ChatSession[] | null>(null);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+    const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
 
     const [sessionBranches, setSessionBranches] = useState<{ [branch_id: string]: Branch } | null>(null);
     // Will have Branch[] all the branch data for this chat session.
@@ -213,16 +214,24 @@ export default function AdvancedChatBoxComponent() {
 
     useEffect(() => {
         const initUser = async () => {
-            const user = await getUser(supabase);
-            if (!user) {
-                redirect('/login')
-            } else {
-                const profile = await fetchProfile(user.id);
-                console.log('profile received-->', profile)
-                if (profile) {
-                    fetchChatSessions();
-                    // setDisabled(false);
+            setIsAuthChecking(true);
+            try {
+                const user = await getUser(supabase);
+                if (!user) {
+                    window.location.href = '/login';
+                    return;
+                } else {
+                    const profile = await fetchProfile(user.id);
+                    console.log('profile received-->', profile)
+                    if (profile) {
+                        fetchChatSessions();
+                    }
                 }
+            } catch (error) {
+                console.error('Authentication error:', error);
+                window.location.href = '/login';
+            } finally {
+                setIsAuthChecking(false);
             }
         };
 
@@ -877,6 +886,15 @@ export default function AdvancedChatBoxComponent() {
         setInputMessage(prevInput => prevInput + emoji)
     }
 
+    if (isAuthChecking) {
+        return (
+            <div className="h-screen w-full flex flex-col items-center justify-center bg-background">
+                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                <p className="text-lg font-medium text-muted-foreground">Loading...</p>
+            </div>
+        );
+    }
+
     return (
         <TooltipProvider>
             <div className="flex h-screen bg-background overflow-hidden">
@@ -1193,8 +1211,10 @@ export default function AdvancedChatBoxComponent() {
                                                         {messageCharts.map((chart, index) => (
                                                             <div key={index} className="border rounded-md p-4 bg-card">
                                                                 <h3 className="text-lg font-medium mb-2">{chart.title || `Data Visualization ${index + 1}`}</h3>
-                                                                <div className="h-[300px] w-full">
-                                                                    <ChartComponent data={chart} />
+                                                                <div className="relative h-[300px] w-full overflow-x-auto">
+                                                                    <div className="min-w-[600px] h-full">
+                                                                        <ChartComponent data={chart} />
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -1217,8 +1237,10 @@ export default function AdvancedChatBoxComponent() {
                                         {charts.map((chart, index) => (
                                             <div key={index} className="border rounded-md p-4 bg-card">
                                                 <h3 className="text-lg font-medium mb-2">{chart.title || `Data Visualization ${index + 1}`}</h3>
-                                                <div className="h-[300px] w-full">
-                                                    <ChartComponent data={chart} />
+                                                <div className="relative h-[300px] w-full overflow-x-auto">
+                                                    <div className="min-w-[600px] h-full">
+                                                        <ChartComponent data={chart} />
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}

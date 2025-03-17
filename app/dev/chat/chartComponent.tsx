@@ -97,6 +97,16 @@ export default function ChartComponent({ data }: ChartComponentProps) {
                 display: !!data.title,
                 text: data.title || '',
             }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    maxRotation: 45,
+                    minRotation: 45,
+                    autoSkip: true,
+                    maxTicksLimit: 20
+                }
+            }
         }
     }
     // Render the appropriate chart type
@@ -116,8 +126,10 @@ export default function ChartComponent({ data }: ChartComponentProps) {
     };
 
     return (
-        <div className="w-full h-full">
+        // <div className="w-full h-full">
+        <>
             {renderChart()}
-        </div>
+        </>
+        // </div>
     );
 }

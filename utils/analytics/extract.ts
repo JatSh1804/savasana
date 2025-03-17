@@ -9,23 +9,6 @@ export interface ChartData {
     title?: string;
 }
 
-// export const extractChartsFromMessage = (messageText: string): ChartData[] => {
-//     try {
-//         // Match different chart formatting patterns to be more flexible
-//         const chartRegex = /```(?:<chart>|chart)\s*([\s\S]*?)(?:<\/chart>|```)/g;
-//         const chartMatches = Array.from(messageText.matchAll(chartRegex));
-//         if (chartMatches.length > 0) {
-//             return chartMatches.map(match => {
-//                 const chartJson = match[1].trim();
-//                 return JSON.parse(chartJson);
-//             });
-//         }
-//     } catch (error) {
-//         console.error('Error extracting chart data:', error);
-//     }
-//     return [];
-// };
-
 /**
  * Removes chart tags and their content from the message text
  * while still allowing the charts to be extracted separately
