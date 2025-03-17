@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createGroq } from "@ai-sdk/groq"
 import { streamText } from "ai";
 import { SupabaseClient } from "@supabase/supabase-js";
 
@@ -59,15 +60,41 @@ export async function GET(request: NextRequest) {
 
 
 const openai = createOpenAI({
-
-    baseURL: 'https://api.groq.com/openai/v1',
+    baseURL: process.env.OPENAI_URL ?? 'https://api.groq.com/openai/v1',
     apiKey: process.env.OPENAI_KEY ?? 'your-api-key-here',
 });
+const groq = createGroq({
+    baseURL: 'https://api.groq.com/openai/v1',
+    apiKey: process.env.OPENAI_KEY
+})
+
+// Helper function to transform sheet data to a markdown table for context
+function transformSheetDataToMarkdown(sheetData: any) {
+    if (!sheetData || !sheetData.headers || !sheetData.rows) return '';
+
+    const { headers, rows } = sheetData;
+    let markdown = '| ' + headers.join(' | ') + ' |\n';
+    markdown += '| ' + headers.map(() => '---').join(' | ') + ' |\n';
+
+    // Add a limited number of rows to avoid context length issues
+    const maxRows = Math.min(rows.length, 100);
+    for (let i = 0; i < maxRows; i++) {
+        const row = rows[i];
+        markdown += '| ' + row.map((cell: any) => cell !== undefined && cell !== null ? cell : '').join(' | ') + ' |\n';
+    }
+
+    // Add a note if we're truncating the data
+    if (rows.length > maxRows) {
+        markdown += `\n*Note: Showing ${maxRows} of ${rows.length} rows*\n`;
+    }
+
+    return markdown;
+}
 
 export async function POST(request: NextRequest): Promise<Response> {
-    const supabase = createClient()
-    const { messages, modelOption } = await request.json();
-
+    const supabase = createClient();
+    const requestData = await request.json();
+    const { messages, modelOption, isSheetMode, sheetData } = requestData;
 
     try {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -75,8 +102,6 @@ export async function POST(request: NextRequest): Promise<Response> {
         if (authError || !user) { return new NextResponse('Unauthorized', { status: 401 }); }
 
         const { data: tokenData, error } = await supabase.rpc('check_and_decrement_tokens', { user_auth_id: user.id });
-
-
 
         if (error) {
             console.log(error)
@@ -88,50 +113,67 @@ export async function POST(request: NextRequest): Promise<Response> {
                 return new NextResponse(error.message, { status: 403 });
             } else {
                 console.error('An unexpected error occurred:', error.message);
-                return new NextResponse('An unexpected error occurred', { status: 405 })
+                return new NextResponse('An unexpected error occurred', { status: 405 });
             }
         }
         console.log('Tokens decremented successfully.');
 
-        // Step 1: Fetch all messages in the current branch
-        // const { data: branchMessages, error: fetchError } = await supabase
-        //     .from('branch_messages')
-        //     .select('*')
-        //     .eq('branch_id', branchId);
-        // if (fetchError) throw fetchError;
-        // const messages = [...branchMessages, userMessage]
+        // Create the system prompt based on mode (regular chat vs sheet analysis)
+        let systemPrompt = modelOption?.system || "You are a helpful assistant.";
 
-        // const { messages, branch_id, modelOption }=await request.json
+        if (isSheetMode && sheetData) {
+            // Enhanced system prompt for sheet analysis
+            systemPrompt = `You are an advanced data analysis assistant specialized in analyzing spreadsheet data.
+            
+I'm providing you with a spreadsheet that has ${sheetData.rows.length} rows and ${sheetData.headers.length} columns.
+The headers for this data are: ${sheetData.headers.join(', ')}.
 
-        // const data = new StreamData()
+Your task:
+1. Analyze the user's question about this data
+2. Provide a clear, concise answer based on the data
+3. When appropriate, include data visualizations by outputting chart specifications in the following format:
+
+\`\`\`<chart>
+{
+  "type": "bar|line|pie|scatter",
+  "labels": ["label1", "label2", ...],
+  "datasets": [
+    {
+      "label": "Dataset Label",
+      "data": [value1, value2, ...]
+    }
+  ],
+  "title": "Chart Title"
+}
+</chart>\`\`\`
+4. Always output the json for the chart between <chart></chart> tags.
+
+Always explain your data insights in plain language before presenting charts. Be prepared to handle queries about calculations, trends, patterns, outliers, and statistics.
+
+Strict Instruction:
+1. Always try to generate graphs and charts for the relevant data of the user prompt.
+2. Never uses the context from previous messages to answer regard any data analysis, only use the sample data provided by the user. 
+3. Always try to answer only to the prompt asked by the user. Try to directly answer the prompt.
+Here's a sample of the data:
+${transformSheetDataToMarkdown(sheetData)}`;
+        }
 
         console.log('modelOption--->', modelOption)
         const response = await streamText({
-            model: openai(modelOption?.model || 'llama-3.2-1b-preview'),
-            temperature: modelOption?.temperature || 0.7,
-            system: modelOption?.system || "You are a chef, also knows bartending, and loves coffee, you are really funny and cute.",
+            model: openai("llama3-70b-8192"),
+            // model: groq('llama3-70b-8192'),
+            temperature: modelOption?.temperature || 0.2,
+            system: systemPrompt,
             messages: messages,
-            maxTokens: Math.max(modelOption?.maxTokens || 200, 250),
-
-            // onFinish({ text }) {
-            //     // Step 6: Add the full LLM response to the database
-            //     // console.log("onFinish Text:", text);
-            //     // console.log(fullResponse);
-
-            //     // setTimeout(() => {
-            //     //     data.append({ branch_id: 'llama-3.2-1b-preview' })
-            //     //     data.close();
-            //     // }, 2000)
-
-            // },
+            maxTokens: 8192,
         });
+
         // Return the streaming response
         return response.toDataStreamResponse({
-            // data,
             headers: {
                 'Content-Type': 'text/event-stream',
             }
-        })
+        });
     }
     catch (error) {
         console.error('Error in sendMessage:', error);

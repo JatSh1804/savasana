@@ -1,7 +1,7 @@
 "use client"
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Pencil, Send, Settings, Bot, LifeBuoy, SquareUser, Rabbit, Bird, Turtle, Plus, Smile, Mic, Check, X, ImageIcon, Trash2 } from 'lucide-react'
+import { Pencil, Send, Settings, Bot, LifeBuoy, SquareUser, Rabbit, Bird, Turtle, Plus, Smile, Mic, Check, X, ImageIcon, Trash2, FileSpreadsheet, UploadCloud, BarChart3 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import ReactMarkdown from "react-markdown";
+import { Switch } from "@/components/ui/switch"
+import ReactMarkdown from "react-markdown"
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenu, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AvatarIcon } from '@radix-ui/react-icons'
 import { logout } from '@/app/logout/actions'
@@ -20,10 +21,14 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import ChevronBox from './chevronBox'
-import { useToast } from "@/hooks/use-toast";
-
+import { useToast } from "@/hooks/use-toast"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+// import { parse } from 'papaparse'
+import * as XLSX from 'xlsx'
+import { ChartData, extractChartsFromMessage, removeChartTagsFromText } from '@/utils/analytics/extract'
 
+// Add ChartComponent for rendering visualizations
+import ChartComponent from './chartComponent'
 interface ChatInstance {
     id: number;
     name: string;
@@ -57,6 +62,15 @@ interface ChatSession {
     // rootBranch: Branch;
     // currentBranch?: Branch; // Pointer to the currently selected branch
 }
+
+// Add interfaces for sheet data and chart data
+interface SheetData {
+    headers: string[];
+    rows: any[][];
+    filename: string;
+}
+
+
 
 const emojiList = [
     '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
@@ -129,17 +143,25 @@ export default function AdvancedChatBoxComponent() {
     const [editingTitleId, setEditedTitleId] = useState<string>('')
     const [newEditedTitle, setNewTitle] = useState<string>('');
 
+    // Add new state variables for sheet analysis
+    const [isSheetMode, setIsSheetMode] = useState<boolean>(false);
+    const [sheetData, setSheetData] = useState<SheetData | null>(null);
+    const [charts, setCharts] = useState<ChartData[]>([]);
+    const sheetFileRef = useRef<HTMLInputElement>(null);
+
     const getIterableStream = async (body: ReadableStream<Uint8Array>, isNormalSendMessage: boolean) => {
         const reader = body.getReader();
         const decoder = new TextDecoder();
         let fullText = '';
         let MessageData: Message = { message_id: '', text: '', sender: 'system', branch_id: '', other_branches: [] };
+        let chartData: ChartData[] = [];
+        const chartRegex = /```chart\s*([\s\S]*?)```/g;
+
         while (true) {
             const { value, done } = await reader.read();
             if (done) {
                 break;
             }
-            // console.log(value)
             const decodedChunk = decoder.decode(value, { stream: true });
 
             const lines = decodedChunk.split('\n').filter(line => line.trim() !== '');
@@ -153,6 +175,23 @@ export default function AdvancedChatBoxComponent() {
                     fullText += processedTextPart; // Append to fullText
                     setGeneratedText(prev => prev + processedTextPart); // Update with the full text so far
 
+                    // Try to extract chart data as streaming comes in
+                    if (isSheetMode) {
+                        // Use Array.from instead of spread to avoid downlevelIteration issues
+                        const chartMatches = Array.from(fullText.matchAll(chartRegex));
+                        if (chartMatches.length > 0) {
+                            try {
+                                const newChartData = chartMatches.map(match => {
+                                    const chartJson = match[1].trim();
+                                    return JSON.parse(chartJson);
+                                });
+                                chartData = newChartData;
+                                setCharts(newChartData);
+                            } catch (error) {
+                                console.log('Parsing chart data in progress...');
+                            }
+                        }
+                    }
                 } else if (line.startsWith('2:')) {
                     // Extract data part
                     try {
@@ -163,14 +202,13 @@ export default function AdvancedChatBoxComponent() {
 
                         console.log('Data received when editing message regarding branches->', MessageData);
                         if (!isNormalSendMessage) { }
-                        // dataArray.push(...jsonData); // Append parsed JSON objects
                     } catch (error) {
                         console.error('Error parsing JSON:', error);
                     }
                 }
             }
         }
-        return { lastGeneratedMessage: fullText, data: MessageData };
+        return { lastGeneratedMessage: fullText, data: MessageData, charts: chartData };
     };
 
     useEffect(() => {
@@ -280,7 +318,7 @@ export default function AdvancedChatBoxComponent() {
             if (!branch) return [];
             console.log('child branch--->', branch)
 
-            const messages = branch.branch_messages.map(msg => ({ ...msg, branch_id: msg.branch_id }));
+            const messages = branch.branch_messages.map(msg => ({ ...msg, branch_id: branchId }));
 
             // const firstMessage = branch.branch_messages[0];
             if (branch.children && branch.children.length > 0) {
@@ -504,7 +542,8 @@ export default function AdvancedChatBoxComponent() {
         try {
             if (disabled || isGenerating) return;
             setDisabled(true);
-            setIsGenerating(true)
+            setIsGenerating(true);
+            setCharts([]); // Clear previous charts
 
             const { data: user_message_id, error } = await supabase
                 .from("branch_messages")
@@ -536,28 +575,37 @@ export default function AdvancedChatBoxComponent() {
                     }
                 };
             });
-            setCurrentBranchMessages(prev => [...prev, userMessage])
-            console.log('Messages prepared to send:->', messages);
+            setCurrentBranchMessages(prev => [...prev, userMessage]);
+
+            // Create request payload with sheet data if in sheet mode
+            const requestPayload = {
+                messages,
+                branch_id: currentActiveBranch,
+                modelOption,
+                isSheetMode,
+                sheetData: isSheetMode ? sheetData : null
+            };
+
             const response = await fetch('/api/dev/chat/get-messages', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    messages,
-                    branch_id: currentActiveBranch,
-                    modelOption
-                }),
+                body: JSON.stringify(requestPayload),
             });
 
             if (!response.ok) {
                 handleError(response);
+                setIsGenerating(false)
                 return;
             }
 
-
             if (!response.body) { handleError(new Response("Some Error Occured", { status: 500 })); throw new Error('Response body does not exist') };
-            const { lastGeneratedMessage, data } = await getIterableStream(response.body, true);
+            const { lastGeneratedMessage, data, charts: extractedCharts } = await getIterableStream(response.body, true);
+
+            if (isSheetMode && extractedCharts.length > 0) {
+                setCharts(extractedCharts);
+            }
 
             const { data: system_message_id, error: system_error } = await supabase
                 .from("branch_messages")
@@ -577,7 +625,6 @@ export default function AdvancedChatBoxComponent() {
             const generatedText: Message = { message_id: system_message_id.message_id, text: lastGeneratedMessage, sender: 'system', branch_id: currentActiveBranch ?? undefined, other_branches: [] }
 
             setCurrentBranchMessages(prev => [...prev, generatedText])
-            console.log('Updated the Branch Message, Updating the Object Branch')
             setSessionBranches(prev => {
                 if (!prev || !currentActiveBranch) return prev;
                 return {
@@ -594,6 +641,8 @@ export default function AdvancedChatBoxComponent() {
             setDisabled(false)
         } catch (error) {
             console.error(error)
+            setIsGenerating(false)
+            setDisabled(false)
         }
     };
 
@@ -723,9 +772,53 @@ export default function AdvancedChatBoxComponent() {
         setInputMessage('');
     };
 
+    // Add file handling functions for sheet upload
+    const handleSheetUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
 
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
 
+                // Convert to JSON
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
+                // Extract headers and rows
+                const headers = jsonData[0] as string[];
+                const rows = jsonData.slice(1) as any[][];
+
+                setSheetData({
+                    headers,
+                    rows,
+                    filename: file.name
+                });
+
+                toast({
+                    title: "Sheet loaded successfully",
+                    description: `${file.name} with ${rows.length} rows and ${headers.length} columns`,
+                    variant: "success"
+                });
+            } catch (error) {
+                console.error("Error parsing Excel file:", error);
+                toast({
+                    title: "Error loading sheet",
+                    description: "Could not parse the Excel file. Please make sure it's a valid XLSX file.",
+                    variant: "destructive"
+                });
+            }
+        };
+
+        reader.readAsArrayBuffer(file);
+    };
+
+    const handleOpenSheetSelector = () => {
+        sheetFileRef.current?.click();
+    };
 
     const switchBranch = (branch_id: string) => {
         if (!sessionBranches) return;
@@ -783,6 +876,7 @@ export default function AdvancedChatBoxComponent() {
     const handleEmojiClick = (emoji: string) => {
         setInputMessage(prevInput => prevInput + emoji)
     }
+
     return (
         <TooltipProvider>
             <div className="flex h-screen bg-background overflow-hidden">
@@ -816,6 +910,7 @@ export default function AdvancedChatBoxComponent() {
                                     onClick={() => {
                                         setCurrentSessionId(sessions.user_chat_id);
                                         setCurrentActiveBranch(sessions.last_branch_created_branch_id);
+                                        setDisabled(false);
                                     }}
                                     variant={sessions.user_chat_id === currentSessionId ? 'default' : 'ghost'}
                                     className="w-full justify-start pr-8"
@@ -875,9 +970,40 @@ export default function AdvancedChatBoxComponent() {
                 {/* Main Chat Area */}
                 <div className="flex-1 flex flex-col">
                     <header className="bg-background border-b p-4 flex items-center justify-between">
-                        <h1 className="text-xl font-semibold">{
-                            // currentGPT.name
-                        }</h1>
+                        <div className="flex items-center space-x-4">
+                            <h1 className="text-xl font-semibold">{isSheetMode ? 'Sheet Analysis' : 'Chat'}</h1>
+
+                            <div className="flex items-center space-x-2">
+                                <Switch
+                                    id="sheet-mode"
+                                    checked={isSheetMode}
+                                    onCheckedChange={setIsSheetMode}
+                                />
+                                <Label htmlFor="sheet-mode">Sheet Analysis</Label>
+                            </div>
+
+                            {isSheetMode && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleOpenSheetSelector}
+                                    className="flex items-center space-x-1"
+                                >
+                                    <FileSpreadsheet className="h-4 w-4" />
+                                    <span>{sheetData ? sheetData.filename : 'Select Sheet'}</span>
+                                </Button>
+                            )}
+                        </div>
+
+                        {/* Hidden file input for sheet upload */}
+                        <input
+                            type="file"
+                            ref={sheetFileRef}
+                            onChange={handleSheetUpload}
+                            accept=".xlsx,.xls,.csv"
+                            className="hidden"
+                        />
+
                         <div className='flex gap-8'>
                             <Drawer>
                                 <DrawerTrigger asChild>
@@ -970,65 +1096,135 @@ export default function AdvancedChatBoxComponent() {
                     <div className="flex-1 p-4 overflow-auto">
                         {/* <AnimatePresence> */}
                         <ScrollArea>
+                            {/* Sheet info display when sheet is loaded */}
+                            {isSheetMode && sheetData && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="mb-4 p-3 border rounded bg-secondary/30"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                            <FileSpreadsheet className="h-5 w-5 text-primary" />
+                                            <div>
+                                                <h3 className="font-medium">{sheetData.filename}</h3>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {sheetData.rows.length} rows, {sheetData.headers.length} columns
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={handleOpenSheetSelector}
+                                        >
+                                            Change
+                                        </Button>
+                                    </div>
+                                </motion.div>
+                            )}
+
                             {currentBranchMessages.map(({ sender, text, message_id, other_branches, branch_id }, index) => {
-                                // console.log('length-->',currentBranchMessages.length)
-                                // console.log('index-->',index)
+                                // Extract charts from message content before removing chart tags
+                                const messageCharts = extractChartsFromMessage(text);
 
-                                return <AnimatePresence key={index}>
-                                    <motion.div
-                                        key={message_id}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ duration: 0.3 }}
-                                        className={`my-2 rounded-sm transition-color ${sender === 'system' ? 'text-left' : 'text-right'}`}
-                                        ref={(el) => { if (message_id !== undefined) messageRefs.current[message_id] = el }}
-                                    >
-                                        {editingMessageId === message_id ? (
-                                            <div className="flex items-center space-x-2">
-                                                <Textarea
-                                                    className="flex-grow"
-                                                    value={editingText}
-                                                    onChange={(e) => setEditingText(e.target.value)}
-                                                />
-                                                <Button onClick={() => handleRegenerateFromEdit(message_id)}>
-                                                    <Check className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    onClick={() => {
-                                                        setEditingId(''); setEditingText('');
-                                                    }}>
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        ) : (<>
-                                            <div key={message_id} className={`relative mb-4 ${sender === 'user' ? 'text-right' : 'text-left'}`}>
-                                                <div className={`group gap-4 flex ${sender === 'user' && "justify-end"}`}>
-                                                    {sender === 'user'
-                                                        // && index !== currentBranchMessages.length - 2
-                                                        && (
+                                // Clean the text by removing chart tags for display
+                                const cleanedText = removeChartTagsFromText(text);
 
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                className="text-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                onClick={() => { setEditingId(message_id); setEditingText(text); }}
-                                                            >
-                                                                <Pencil className="h-4 w-4 text-foreground-primary" />
-                                                                <span className="sr-only">Edit</span>
-                                                            </Button>
-                                                        )}
-                                                    <div className={`inline-block p-2 rounded-lg ${sender === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
-                                                        <ReactMarkdown children={text} />
-                                                    </div>
+                                return (
+                                    <AnimatePresence key={index}>
+                                        <motion.div
+                                            key={message_id}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ duration: 0.3 }}
+                                            className={`my-2 rounded-sm transition-color ${sender === 'system' ? 'text-left' : 'text-right'}`}
+                                            ref={(el) => { if (message_id !== undefined) messageRefs.current[message_id] = el }}
+                                        >
+                                            {editingMessageId === message_id ? (
+                                                <div className="flex items-center space-x-2">
+                                                    <Textarea
+                                                        className="flex-grow"
+                                                        value={editingText}
+                                                        onChange={(e) => setEditingText(e.target.value)}
+                                                    />
+                                                    <Button onClick={() => handleRegenerateFromEdit(message_id)}>
+                                                        <Check className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        onClick={() => {
+                                                            setEditingId(''); setEditingText('');
+                                                        }}>
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
                                                 </div>
-                                                <ChevronBox branch_id={branch_id} currentBranchId={currentActiveBranch || ''} other_branches={other_branches} text={text} sender={sender} switchBranch={switchBranch} />
-                                            </div>
-                                        </>
+                                            ) : (
+                                                <>
+                                                    <div className={`relative mb-4 ${sender === 'user' ? 'text-right' : 'text-left'}`}>
+                                                        <div className={`group gap-4 flex ${sender === 'user' && "justify-end"}`}>
+                                                            {sender === 'user' && (
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="text-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                    onClick={() => { setEditingId(message_id); setEditingText(text); }}
+                                                                >
+                                                                    <Pencil className="h-4 w-4 text-foreground-primary" />
+                                                                    <span className="sr-only">Edit</span>
+                                                                </Button>
+                                                            )}
+                                                            <div className={`inline-block p-2 rounded-lg ${sender === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
+                                                                <ReactMarkdown children={cleanedText} />
+                                                            </div>
+                                                        </div>
+                                                        <ChevronBox branch_id={branch_id} currentBranchId={currentActiveBranch || ''} other_branches={other_branches} text={text} sender={sender} switchBranch={switchBranch} />
+                                                    </div>
+                                                </>
+                                            )}
 
-                                        )}
-                                    </motion.div>
-                                </AnimatePresence>
+                                            {/* Render charts if any */}
+                                            {messageCharts.length > 0 && (
+                                                <motion.div
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    className="my-4"
+                                                >
+                                                    <div className="space-y-6">
+                                                        {messageCharts.map((chart, index) => (
+                                                            <div key={index} className="border rounded-md p-4 bg-card">
+                                                                <h3 className="text-lg font-medium mb-2">{chart.title || `Data Visualization ${index + 1}`}</h3>
+                                                                <div className="h-[300px] w-full">
+                                                                    <ChartComponent data={chart} />
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </motion.div>
+                                    </AnimatePresence>
+                                );
                             })}
+
+                            {/* Chart displays */}
+                            {isSheetMode && charts.length > 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="my-4"
+                                >
+                                    <div className="space-y-6">
+                                        {charts.map((chart, index) => (
+                                            <div key={index} className="border rounded-md p-4 bg-card">
+                                                <h3 className="text-lg font-medium mb-2">{chart.title || `Data Visualization ${index + 1}`}</h3>
+                                                <div className="h-[300px] w-full">
+                                                    <ChartComponent data={chart} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
                         </ScrollArea>
                         {isGenerating && (
                             <AnimatePresence>
@@ -1049,7 +1245,7 @@ export default function AdvancedChatBoxComponent() {
                     </div>
 
                     {/* Input and Send Button */}
-                    < footer className="p-4 border-t bg-background" >
+                    <footer className="p-4 border-t bg-background" >
                         <div className="flex items-center space-x-2 relative">
                             <Popover>
                                 <PopoverTrigger asChild>
@@ -1074,45 +1270,67 @@ export default function AdvancedChatBoxComponent() {
                                 </PopoverContent>
                             </Popover>
                             <Input
-                                placeholder="Type your message..."
+                                placeholder={isSheetMode ? "Ask questions about your sheet data..." : "Type your message..."}
                                 value={inputMessage}
                                 onChange={(e) => setInputMessage(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(inputMessage)}
+                                disabled={isSheetMode && !sheetData}
                             />
 
-                            <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                ref={fileInputRef}
-                            // onChange={handleImageUpload}
-                            />
+                            {isSheetMode ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleOpenSheetSelector}
+                                    className="flex-shrink-0"
+                                    disabled={isGenerating}
+                                >
+                                    <UploadCloud className="h-4 w-4" />
+                                </Button>
+                            ) : (
+                                <>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        ref={fileInputRef}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        <ImageIcon className="h-4 w-4" />
+                                    </Button>
+                                </>
+                            )}
+
                             <Button
                                 type="button"
                                 variant="outline"
                                 size="icon"
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                <ImageIcon className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                // onClick={handleAudioRecording}
                                 className={isRecording ? 'bg-red-500 text-white' : ''}
                             >
                                 <Mic className="h-4 w-4" />
                             </Button>
-                            <Button type="submit" onClick={() => handleSendMessage(inputMessage)} disabled={disabled || isGenerating}>
+
+                            <Button
+                                type="submit"
+                                onClick={() => handleSendMessage(inputMessage)}
+                                disabled={disabled || isGenerating || (isSheetMode && !sheetData)}
+                            >
                                 <Send className="h-4 w-4 mr-2" />
                                 Send
                             </Button>
-
-                            {/* <Button onClick={() => handleSendMessage()} disabled={isGenerating}>
-                <Send className="h-5 w-5" />
-              </Button> */}
                         </div>
+
+                        {isSheetMode && !sheetData && (
+                            <p className="mt-2 text-sm text-muted-foreground text-center">
+                                Please upload a spreadsheet to analyze
+                            </p>
+                        )}
                     </footer>
                 </div>
             </div >
