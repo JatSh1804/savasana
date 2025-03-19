@@ -131,7 +131,7 @@ The headers for this data are: ${sheetData.headers.join(', ')}.
 Your task:
 1. Analyze the user's question about this data
 2. Provide a clear, concise answer based on the data
-3. When appropriate, include data visualizations by outputting chart specifications in the following format:
+3. When appropriate, include data visualizations by outputting chart specifications using EXACTLY the following format (including the backticks):
 
 \`\`\`<chart>
 {
@@ -146,14 +146,35 @@ Your task:
   "title": "Chart Title"
 }
 </chart>\`\`\`
-4. Always output the json for the chart between <chart></chart> tags.
+
+IMPORTANT: 
+- Your chart data MUST be enclosed in triple backticks followed by <chart> tag
+- Always end with </chart> tag and triple backticks
+- The JSON must be valid and properly formatted
+- Do not forget the opening and closing triple backticks
+
+Example of correct format:
+\`\`\`<chart>
+{
+  "type": "bar",
+  "labels": ["Jan", "Feb", "Mar"],
+  "datasets": [
+    {
+      "label": "Sales",
+      "data": [12, 19, 3]
+    }
+  ],
+  "title": "Quarterly Sales"
+}
+</chart>\`\`\`
 
 Always explain your data insights in plain language before presenting charts. Be prepared to handle queries about calculations, trends, patterns, outliers, and statistics.
 
-Strict Instruction:
-1. Always try to generate graphs and charts for the relevant data of the user prompt.
-2. Never uses the context from previous messages to answer regard any data analysis, only use the sample data provided by the user. 
-3. Always try to answer only to the prompt asked by the user. Try to directly answer the prompt.
+Strict Instructions:
+1. Always generate graphs and charts for the relevant data related to the user prompt.
+2. Never use context from previous messages for data analysis, only use the sample data provided.
+3. Answer directly to the user's prompt and be concise.
+4. ALWAYS use the exact format with backticks for charts as shown above.
 Here's a sample of the data:
 ${transformSheetDataToMarkdown(sheetData)}`;
         }
