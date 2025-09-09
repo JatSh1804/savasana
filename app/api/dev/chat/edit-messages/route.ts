@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
             }
 
             const response = await streamText({
-                model: openai(modelOption?.model || 'llama-3.2-1b-preview'),
+                model: openai('llama-3.3-70b-versatile'),
                 temperature: modelOption?.temperature || 0.7,
                 system: modelOption?.system || "You are a chef, also knows bartending, and loves coffee, you are really funny and cute.",
                 messages: mergedMessage,

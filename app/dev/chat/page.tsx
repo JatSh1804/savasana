@@ -94,7 +94,7 @@ interface ModelOption {
     system: string;
     temperature: number;
     context?: string
-    model: 'llama-3.2-1b-preview' | 'mixtral-8x7b-32768' | 'gemma-7b-it';
+    model: 'llama-3.3-70b-versatile' | 'mixtral-8x7b-32768' | 'gemma-7b-it';
     max_tokens: number;
 }
 
@@ -134,7 +134,7 @@ export default function AdvancedChatBoxComponent() {
 
     const [editingText, setEditingText] = useState<string>('');
 
-    const [modelOption, setModelOption] = useState<ModelOption>({ system: '', temperature: 0.7, max_tokens: 100, model: 'llama-3.2-1b-preview' })
+    const [modelOption, setModelOption] = useState<ModelOption>({ system: '', temperature: 0.7, max_tokens: 100, model: 'llama-3.3-70b-versatile' })
     const [temperature, setTemperature] = useState(0.7);
     const [max_tokens, setMaxTokens] = useState(100);
     const [fine_tune, setFineTune] = useState('')

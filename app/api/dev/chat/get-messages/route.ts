@@ -181,7 +181,7 @@ ${transformSheetDataToMarkdown(sheetData)}`;
 
         console.log('modelOption--->', modelOption)
         const response = await streamText({
-            model: openai("llama3-70b-8192"),
+            model: openai("llama-3.3-70b-versatile"),
             // model: groq('llama3-70b-8192'),
             temperature: modelOption?.temperature || 0.2,
             system: systemPrompt,
