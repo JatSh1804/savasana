@@ -94,7 +94,7 @@ interface ModelOption {
     system: string;
     temperature: number;
     context?: string
-    model: 'llama-3.3-70b-versatile' | 'mixtral-8x7b-32768' | 'gemma-7b-it';
+    model: 'llama-3.3-70b-versatile' | 'llama-3.2-1b-preview' | 'mixtral-8x7b-32768' | 'gemma-7b-it';
     max_tokens: number;
 }
 
@@ -250,7 +250,7 @@ export default function AdvancedChatBoxComponent() {
                 if (activeSession.modeloption) {
                     setModelOption(activeSession.modeloption);
                 } else {
-                    setModelOption({ system: '', temperature: 0.7, max_tokens: 100, model: 'llama-3.2-1b-preview' });
+                    setModelOption({ system: '', temperature: 0.7, max_tokens: 100, model: 'llama-3.3-70b-versatile' });
                 }
             }
             fetchBranchesForSession(currentSessionId);
